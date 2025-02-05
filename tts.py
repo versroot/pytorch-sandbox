@@ -18,6 +18,7 @@ is_paused = threading.Event()
 is_stopped = threading.Event()
 speed_factor = 1.0  # Default speed
 audio_queue = queue.Queue()
+is_playing = False  # Flag to indicate if audio is currently playing
 
 # Hover-translation variables
 current_tooltip = None
@@ -159,13 +160,17 @@ def speak():
     Called when user presses Speak. Spawns a background thread
     to read the entire text, split into sentences, with optional pause/resume.
     """
+    global is_playing
     is_paused.clear()
     is_stopped.clear()
+    is_playing = True
 
     def run_tts():
-        text = text_box.get("1.0", tk.END).strip()
+        global is_playing  # Declare is_playing as global here
+        text = text_box.get(tk.INSERT, tk.END).strip()
         if not text:
             print("No text to speak.")
+            is_playing = False
             return
 
         # Split into sentences
@@ -202,15 +207,18 @@ def speak():
 
         # Remove highlight after reading
         text_box.tag_remove("highlight", "1.0", tk.END)
+        is_playing = False
 
     # Start TTS in background
     threading.Thread(target=run_tts, daemon=True).start()
 
 def pause():
+    global is_playing
     print("pause")
     is_paused.set()
     try:
-        sd.stop()
+        if is_playing:
+            sd.stop()
     except Exception as e:
         print("Audio already stopped:", e)
 
@@ -219,13 +227,16 @@ def resume():
     is_paused.clear()
 
 def stop():
+    global is_playing
     print("stop")
     is_stopped.set()
     try:
-        sd.stop()
+        if is_playing:
+            sd.stop()
     except Exception as e:
         print("Could not stop audio:", e)
     text_box.tag_remove("highlight", "1.0", tk.END)
+    is_playing = False
 
 def update_speed(val):
     global speed_factor
@@ -264,7 +275,7 @@ translate_button.place(x=10, y=400)
 speed_scale = tk.Scale(root, from_=0.5, to=2.0, resolution=0.1, orient=tk.HORIZONTAL, command=update_speed,
                        label="Speed")
 speed_scale.set(speed_factor)
-speed_scale.place(x=370, y=0)
+speed_scale.place(x=150, y=400)
 
 def on_close():
     stop()
